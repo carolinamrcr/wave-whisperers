@@ -13,7 +13,7 @@ from scipy.cluster import hierarchy
 
 
 # Specify the location code
-location_code = 'NNOR'
+location_code = 'MEIA'
 
 # Define the location mapping
 location_mapping = {
@@ -29,7 +29,7 @@ location_name = location_mapping.get(location_code, location_code)
 
 # Assuming the files are in the same folder and follow a naming pattern
 file_name = f"{location_code}_time_series.csv"
-file_path = os.path.join(r"C:\Users\danie\Desktop\WaveShisperers\WaveShisperers\dataset_linhascosta", file_name)
+file_path = os.path.join(r"C:\Users\danie\Documents\GitHub\wave-whisperers\dataset_linhascosta", file_name)
 
 # Check if the file exists before reading
 if os.path.exists(file_path):
@@ -38,11 +38,17 @@ if os.path.exists(file_path):
     data = data.iloc[:, 1:]
     data['dates'] = pd.to_datetime(data['dates'])
     data.set_index('dates', inplace=True)
+    for col in data.columns.tolist():
+        new_col_name = 'chan' + col
+        data[new_col_name] = data[col].diff()
+        data = data.drop(col, axis=1)
 else:
     print(f"File not found for location code '{location_code}'.")
 
+print(data.head())
+
 # Calculate the annual median for numeric values of the same year
-annual_data = data.groupby(data.index.year).median(numeric_only=True)
+annual_data = data.groupby(data.index.year).sum(numeric_only=True)
 annual_data.index.name = 'years'
 
 #------------------------------------------------------------------------------------------------------------------------------------------------

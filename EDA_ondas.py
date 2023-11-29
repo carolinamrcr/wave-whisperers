@@ -14,6 +14,7 @@ wave_data = pd.read_csv(file_path, sep=',', header=0)  # Set header=0 to use the
 wave_data['time'] = pd.to_datetime(wave_data['time'])
 wave_data.set_index('time', inplace=True)
 wave_data['years'] = wave_data.index.year
+wave_data = wave_data[wave_data['years'] != 1983]
 
 def degrees_to_quadrant(wave_direction_degrees):
     if wave_direction_degrees >= 0 and   wave_direction_degrees <= 11.25:
@@ -63,7 +64,7 @@ wave_data = pd.concat([wave_data, one_hot_encode], axis=1)
 wave_data = wave_data.drop('mwd', axis=1)
 
 # List of directions
-directions = ['E', 'ENE', 'ESE', 'N', 'NE', 'NNE', 'NNW', 'NW', 'S', 'SE', 'SSE', 'SSW', 'SW', 'W', 'WNW', 'WSW']
+directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW']
 
 # Iterate through directions and create new columns
 for direction in directions:
@@ -78,14 +79,51 @@ for direction in directions:
 wave_data.drop(columns=[f'from_{direction}' for direction in directions], inplace=True)
 wave_data.drop(columns=['pp1d','swh'], inplace=True)
 
-# Set the index to 'years'
-annual_wave_data = wave_data.groupby('years').quantile(0.9)
-#annual_wave_data.set_index('years', inplace=True)
-      
-correlation_matrix = annual_wave_data.corr()
-sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm')
-plt.title('Correlation Matrix')
-plt.show()
+wave_data = wave_data.replace(0, np.nan)
+
+# Create a new DataFrame for boxplotting
+boxplot_data_pp1d = pd.DataFrame()
+boxplot_data_swh = pd.DataFrame()
+
+# Populate the new DataFrame with the columns from the original DataFrame
+for direction in directions:
+    pp1d_column_name = f'pp1d_from_{direction}'
+    swh_column_name = f'swh_from_{direction}'
+    
+    boxplot_data_pp1d[direction] = wave_data[pp1d_column_name]
+    boxplot_data_swh[direction] = wave_data[swh_column_name]
+
+#------------------------------------------------------------------------------------------------------------------------------------------------
+# Boxplot for pp1d
+plt.figure(figsize=(12, 6))
+sns.boxplot(data=boxplot_data_pp1d)
+plt.title('Boxplot of wave peak period', fontweight='bold')
+plt.xlabel('Provenance', fontweight='bold')
+plt.ylabel('Peak period (s)', fontweight='bold')
+plt.savefig('BP_pp1d.png')  # You can change the file format (e.g., 'your_figure_name.pdf')
+
+#------------------------------------------------------------------------------------------------------------------------------------------------
+# Boxplot for swh
+plt.figure(figsize=(12, 6))
+sns.boxplot(data=boxplot_data_swh)
+plt.title('Boxplot of significant wave height', fontweight='bold')
+plt.xlabel('Provenance', fontweight='bold')
+plt.ylabel('Significant wave height (m)', fontweight='bold')
+plt.savefig('BP_swh.png')  # You can change the file format (e.g., 'your_figure_name.pdf')
+
+#------------------------------------------------------------------------------------------------------------------------------------------------
+
+def custom_quantile(series):
+    non_zero_values = series[series != 0]
+    if len(non_zero_values) > 0:
+        return non_zero_values.quantile(0.9)
+    else:
+        return 0  # You can choose a different default value if needed
+
+# Group by 'years' and apply the custom_quantile function
+annual_wave_data = wave_data.groupby('years').agg(custom_quantile).reset_index()
+# Set the 'years' column as the index
+annual_wave_data.set_index('years', inplace=True)
 
 
 
