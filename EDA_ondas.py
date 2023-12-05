@@ -8,7 +8,7 @@ import seaborn as sns
 import numpy as np
 import os
 
-file_path = os.path.join(r"C:\Users\danie\Documents\GitHub\wave-whisperers\dataset_Ondas\wave_time_series.csv")
+file_path = os.path.join(r"C:\Users\danie\Documents\GitHub\wave-whisperers\dataset_Ondas\CCFT_wave_timeseries.csv")
 
 wave_data = pd.read_csv(file_path, sep=',', header=0)  # Set header=0 to use the first row as column headers
 wave_data['time'] = pd.to_datetime(wave_data['time'])

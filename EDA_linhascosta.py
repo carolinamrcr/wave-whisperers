@@ -10,8 +10,6 @@ from scipy.cluster.hierarchy import dendrogram, linkage
 from scipy.spatial.distance import pdist
 from scipy.cluster import hierarchy
 
-
-
 # Specify the location code
 location_code = 'MEIA'
 

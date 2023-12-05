@@ -140,19 +140,27 @@ y_pred = model.predict(X_test)
 
 df_y_pred = pd.DataFrame(y_pred, columns=['CCFT_1', 'CCFT_2', 'CCFT_3', 'CCFT_4', 'CCFT_5', 'CCFT_6', 'CCFT_7', 'CCFT_8', 'CCFT_9', 'CCFT_10', 'CCFT_11', 'CCFT_12', 'CCFT_13', 'CCFT_14', 'CCFT_15', 'CCFT_16', 'CCFT_17', 'CCFT_18', 'CCFT_19', 'CCFT_20', 'CCFT_21', 'CCFT_22', 'CCFT_23', 'CCFT_24', 'CCFT_25', 'CCFT_26', 'CCFT_27', 'CCFT_28'])
 
-print(y_pred)
+y_test_array = np.array(y_test.values)
+y_pred_array = np.array(y_pred)
 
-from sklearn.metrics import mean_squared_error
+y_test_flat = y_test_array.flatten()
+y_pred_flat = y_pred.flatten()
 
-mse = mean_squared_error(y_test, y_pred)
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
+# Assuming y_test and y_pred are your true and predicted values
+# Calculate metrics
+mae = mean_absolute_error(y_test_flat, y_pred_flat)
+mse = mean_squared_error(y_test_flat, y_pred_flat)
 rmse = np.sqrt(mse)
+r2 = r2_score(y_test_flat, y_pred_flat)
 
-print(rmse)
+# Print the results
+print(f'Mean Absolute Error (MAE): {mae}')
+print(f'Mean Squared Error (MSE): {mse}')
+print(f'Root Mean Squared Error (RMSE): {rmse}')
+print(f'R-squared (R2): {r2}')
 
-from  sklearn.metrics import explained_variance_score
 
-explained_var = explained_variance_score(y_test, y_pred)
 
-print(explained_var)
 
