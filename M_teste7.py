@@ -11,7 +11,10 @@ shorelines_folder_path = r"C:\Users\danie\Documents\GitHub\wave-whisperers\datas
 transects_folder_path = r"C:\Users\danie\Documents\GitHub\wave-whisperers\dataset_transects"
 
 # List of file names 
-site_names = ["CCFT", "TROI", "NNOR", "MEIA", "VAGR"]
+site_names = ['CVCC','CCFT','FTAD','ADLA','LABI',
+              'TRAT','ATMC','MCCO','CCCL','NNOR',
+              'MEIA','TORR','CVMR','MRMG','MGVR',
+              'COSN','VAGR','GBHA','BARR','MIRA']
 
 # Create an empty dictionary to store DataFrames
 data = {}
@@ -21,7 +24,7 @@ for name in site_names:
     # Construct the file paths
     waves_file_path = os.path.join(waves_folder_path, f"{name}_wave_timeseries.csv")
     shorelines_file_path = os.path.join(shorelines_folder_path, f"{name}_shoreline_timeseries.csv")
-    transects_file_path = os.path.join(transects_folder_path, f"{name}_transects.geojson")
+    transects_file_path = os.path.join(transects_folder_path, f"{name}_T.geojson")
 
     # Read the waves CSV files into DataFrame
     waves_df = pd.read_csv(waves_file_path, sep=',', header=0) # Set header=0 to use the first row as column headers
@@ -124,8 +127,6 @@ for name in site_names:
         'shorelines': shorelines_df,
         'transects': transects_gdf
     }
-
-print(data['CCFT']['waves'].head())
 
 # Initialize an empty dictionary to store the results
 annual_data = {}
@@ -306,8 +307,21 @@ for name in data.keys():
 
     shoreline_df = data[name]['shorelines']
 
-    # Group by 'years' and calculate median for each column
+        # Create a MultiIndex with all possible combinations of years and months
+    all_years = shoreline_df.index.get_level_values('years').unique()
+    all_months = range(1, 13)
+    all_combinations = [(year, month) for year in all_years for month in all_months]
+
+    full_index = pd.MultiIndex.from_tuples(all_combinations, names=['years', 'months'])
+
+    # Group by the MultiIndex and calculate the median
     shoreline_df_annual = shoreline_df.groupby(level=['years', 'months']).median(numeric_only=True)
+
+    # Reindex with the full MultiIndex to fill missing combinations with NaN
+    shoreline_df_annual = shoreline_df_annual.reindex(full_index)
+
+    # If needed, you can drop the existing 'months' column
+    shoreline_df_annual = shoreline_df_annual.drop('months', axis=1)
     
     # Drop year and month columns
     #shoreline_df_annual = shoreline_df_annual.drop(['years', 'months'], axis=1)
@@ -373,7 +387,7 @@ waves_data = [annual_data[name]['waves'].values for name in input_names]
 output_data = [annual_data[name]['shorelines'].values for name in input_names]
 
 # Model Architecture
-shoreline_input = Input(shape=(shorelines_data[0].shape[1],), name='shoreline_input')
+shoreline_input = Input(shape=(shorelines_data[0].shape[9],), name='shoreline_input')
 waves_input = Input(shape=(waves_data[0].shape[1],), name='waves_input')
 
 # Add more layers as needed for your specific problem
@@ -387,6 +401,7 @@ model = Model(inputs=[shoreline_input, waves_input], outputs=output_layer)
 model.compile(optimizer='adam', loss='mean_squared_error', metrics=['mae'])
 
 # Model Training
+# Assuming shorelines_data, waves_data, and output_data are numpy arrays
 model.fit(x={'shoreline_input': shorelines_data, 'waves_input': waves_data},
           y=output_data,
           epochs=50,
