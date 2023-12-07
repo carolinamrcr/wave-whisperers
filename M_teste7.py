@@ -134,9 +134,10 @@ annual_data = {}
 # Iterate over keys in the data dictionary
 for name in data.keys():
     waves_df = data[name]['waves']
+
+    #waves_df = waves_df.drop(['years', 'months'], axis=1)
     
-    # Group by 'years' and calculate quantiles for each column
-    wave_df_annual = waves_df.groupby(level=['years', 'months']).agg(
+    waves_df_annual = waves_df.groupby([waves_df.index.get_level_values('years'), waves_df.index.get_level_values('months')]).agg(
            {
         'pp1d_from_N': [
             ('10th_quantile', lambda x: x[x != 0].quantile(0.1) if any(x != 0) else None),
@@ -298,16 +299,15 @@ for name in data.keys():
             ('50th_quantile', lambda x: x[x != 0].quantile(0.5) if any(x != 0) else None),
             ('90th_quantile', lambda x: x[x != 0].quantile(0.9) if any(x != 0) else None)
         ]})
-    
-    # Drop the 'years' and 'month' columns
-    #wave_df_annual = wave_df_annual.drop(['years', 'month'], axis=1)
+
+    waves_df_annual = waves_df_annual.fillna(0)
 
     # Replace NaN values with zero
-    wave_df_annual = wave_df_annual.fillna(0)
+    #waves_df_annual = waves_df_annual.fillna(0)
 
     shoreline_df = data[name]['shorelines']
 
-        # Create a MultiIndex with all possible combinations of years and months
+    # Create a MultiIndex with all possible combinations of years and months
     all_years = shoreline_df.index.get_level_values('years').unique()
     all_months = range(1, 13)
     all_combinations = [(year, month) for year in all_years for month in all_months]
@@ -321,98 +321,166 @@ for name in data.keys():
     shoreline_df_annual = shoreline_df_annual.reindex(full_index)
 
     # If needed, you can drop the existing 'months' column
-    shoreline_df_annual = shoreline_df_annual.drop('months', axis=1)
+    #shoreline_df_annual = shoreline_df_annual.drop('months', axis=1)
     
     # Drop year and month columns
-    #shoreline_df_annual = shoreline_df_annual.drop(['years', 'months'], axis=1)
+    shoreline_df_annual = shoreline_df_annual.drop(['years', 'months'], axis=1)
 
     # Iterate over each column in the DataFrame
 
     for i in range(1, len(shoreline_df_annual.columns) - 1):
         col = shoreline_df_annual.columns[i]
-        prev_col = shoreline_df_annual.columns[i - 1] if i - 1 >= 0 else None
-        next_col = shoreline_df_annual.columns[i + 1] if i + 1 < len(shoreline_df_annual.columns) else None
+    
+        # Skip columns with names "years" or "months"
+        if col.lower() not in ['years', 'months']:
+            prev_col = shoreline_df_annual.columns[i - 1] if i - 1 >= 0 else None
+            next_col = shoreline_df_annual.columns[i + 1] if i + 1 < len(shoreline_df_annual.columns) else None
 
-        # Check if there are any NaN values in the current column
-        if shoreline_df_annual[col].isnull().any():
-            # Fill NaN values with the mean of the available previous and next columns
-            if prev_col is not None and next_col is not None:
-                shoreline_df_annual[col] = (shoreline_df_annual[prev_col] + shoreline_df_annual[next_col]) / 2
-            elif prev_col is not None:
-                shoreline_df_annual[col] = shoreline_df_annual[prev_col]
-            elif next_col is not None:
-                shoreline_df_annual[col] = shoreline_df_annual[next_col]
-            else:
-                # If there are no immediate previous and next columns, extend the search to 3 columns
-                prev_cols = [shoreline_df_annual.columns[j] for j in range(i - 2, i) if j >= 0]
-                next_cols = [shoreline_df_annual.columns[j] for j in range(i + 1, i + 4) if j < len(shoreline_df_annual.columns)]
+            # Check if there are any NaN values in the current column
+            if shoreline_df_annual[col].isnull().any():
+                # Fill NaN values with the mean of the available previous and next columns
+                if prev_col is not None and next_col is not None:
+                    shoreline_df_annual[col] = (shoreline_df_annual[prev_col] + shoreline_df_annual[next_col]) / 2
+                elif prev_col is not None:
+                    shoreline_df_annual[col] = shoreline_df_annual[prev_col]
+                elif next_col is not None:
+                    shoreline_df_annual[col] = shoreline_df_annual[next_col]
+                else:
+                    # If there are no immediate previous and next columns, extend the search to 3 columns
+                    prev_cols = [shoreline_df_annual.columns[j] for j in range(i - 2, i) if j >= 0]
+                    next_cols = [shoreline_df_annual.columns[j] for j in range(i + 1, i + 4) if j < len(shoreline_df_annual.columns)]
 
-                available_cols = prev_cols + next_cols
+                    available_cols = prev_cols + next_cols
 
-                # Filter out None values (columns that are out of range)
-                available_cols = [col for col in available_cols if col is not None]
+                    # Filter out None values (columns that are out of range)
+                    available_cols = [col for col in available_cols if col is not None]
 
-                # Take the mean of available columns
-                if len(available_cols) > 0:
-                    shoreline_df_annual[col] = shoreline_df_annual[available_cols].mean(axis=1)
+                    # Take the mean of available columns
+                    if len(available_cols) > 0:
+                        shoreline_df_annual[col] = shoreline_df_annual[available_cols].mean(axis=1)
 
+    # Perform median replacement only for columns that are not "years" or "months"
     for column in shoreline_df_annual.columns:
-        # Check if there are any NaN values in the column
-        if shoreline_df_annual[column].isnull().any():
-            # Calculate the median value of the column (excluding NaN values)
-            median_value = shoreline_df_annual[column].median()
+        if column.lower() not in ['years', 'months']:
+            # Check if there are any NaN values in the column
+            if shoreline_df_annual[column].isnull().any():
+                # Calculate the median value of the column (excluding NaN values)
+                median_value = shoreline_df_annual[column].median()
         
-            # Replace NaN values with the calculated median value
-            shoreline_df_annual[column].fillna(median_value, inplace=True)
+                # Replace NaN values with the calculated median value
+                shoreline_df_annual[column].fillna(median_value, inplace=True)
 
     # Add the DataFrame to the dictionary with site name as key
     annual_data[name] = {
-        'waves': wave_df_annual,
+        'waves': waves_df_annual,
         'shorelines': shoreline_df_annual
     }
 
+#DAQUI PARA BAIXO NÃO COPIEM!
 
 
+compiled_data = pd.DataFrame()
 
+# Iterate over each 'name' and each key (e.g., 'waves', 'shorelines')
+for name, data in annual_data.items():
+    for key, df in data.items():
+        # Concatenate the dataframes along the rows
+        compiled_data = pd.concat([compiled_data, df], ignore_index=True)
 
-import tensorflow as tf
-from tensorflow.keras import layers, Input, Model
+# Extract year and month from the MultiIndex
+compiled_data['year'] = compiled_data.index.get_level_values('year')
+compiled_data['month'] = compiled_data.index.get_level_values('month')
 
-# Assuming 'shorelines' and 'waves' have consistent time indices
+# Filter the compiled data until the year 2014
+compiled_data = compiled_data[(compiled_data['year'] < 2014) | ((compiled_data['year'] == 2014) & (compiled_data['month'] <= 12))]
 
-# Data Preparation
-input_names = list(annual_data.keys())
-shorelines_data = [annual_data[name]['shorelines'].values for name in input_names]
-waves_data = [annual_data[name]['waves'].values for name in input_names]
-output_data = [annual_data[name]['shorelines'].values for name in input_names]
+# Drop the 'year' and 'month' columns if you don't need them anymore
+compiled_data = compiled_data.drop(['year', 'month'], axis=1)
 
-# Model Architecture
-shoreline_input = Input(shape=(shorelines_data[0].shape[9],), name='shoreline_input')
-waves_input = Input(shape=(waves_data[0].shape[1],), name='waves_input')
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import TensorDataset, DataLoader
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 
-# Add more layers as needed for your specific problem
-combined = layers.concatenate([shoreline_input, waves_input], axis=-1)
-hidden_layer = layers.Dense(64, activation='relu')(combined)
-output_layer = layers.Dense(shoreline_input.shape[1], activation='linear', name='output')(hidden_layer)
+# Assuming wave_df_annual and shoreline_df_annual are your time series DataFrames
 
-model = Model(inputs=[shoreline_input, waves_input], outputs=output_layer)
+# Example data preparation (you should adapt this based on your data)
+X_waves_train, X_waves_test, y_shorelines_train, y_shorelines_test = train_test_split(
+    annual_data['waves'], annual_data['shorelines'], test_size=0.2, random_state=42
+)
 
-# Model Compilation
-model.compile(optimizer='adam', loss='mean_squared_error', metrics=['mae'])
+# Standardize the data
+scaler = StandardScaler()
+X_waves_train_scaled = scaler.fit_transform(X_waves_train)
+X_waves_test_scaled = scaler.transform(X_waves_test)
 
-# Model Training
-# Assuming shorelines_data, waves_data, and output_data are numpy arrays
-model.fit(x={'shoreline_input': shorelines_data, 'waves_input': waves_data},
-          y=output_data,
-          epochs=50,
-          batch_size=32,
-          validation_split=0.2)
+# Convert data to PyTorch tensors
+X_waves_train_tensor = torch.tensor(X_waves_train_scaled, dtype=torch.float32)
+X_waves_test_tensor = torch.tensor(X_waves_test_scaled, dtype=torch.float32)
+y_shorelines_train_tensor = torch.tensor(y_shorelines_train.values, dtype=torch.float32)
+y_shorelines_test_tensor = torch.tensor(y_shorelines_test.values, dtype=torch.float32)
 
-# Model Evaluation (optional)
-# Evaluate the model on a validation set
+# Create custom dataset and dataloaders
+train_dataset = TensorDataset(X_waves_train_tensor, y_shorelines_train_tensor)
+test_dataset = TensorDataset(X_waves_test_tensor, y_shorelines_test_tensor)
 
-# Prediction
-# Use the trained model to make predictions on new data
+train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+
+# Define the neural network model
+class ShorelinesPredictor(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size):
+        super(ShorelinesPredictor, self).__init__()
+        self.hidden_layer = nn.Linear(input_size, hidden_size)
+        self.relu = nn.ReLU()
+        self.output_layers = nn.ModuleList([nn.Linear(hidden_size, 1) for _ in range(output_size)])
+
+    def forward(self, x):
+        x = self.relu(self.hidden_layer(x))
+        outputs = [output_layer(x) for output_layer in self.output_layers]
+        return outputs
+
+# Instantiate the model
+input_size = X_waves_train_tensor.shape[1]
+hidden_size = 128
+output_size = y_shorelines_train_tensor.shape[1]
+
+model = ShorelinesPredictor(input_size, hidden_size, output_size)
+
+# Define loss function and optimizer
+criterion = nn.MSELoss()
+optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+# Training the model
+num_epochs = 50
+for epoch in range(num_epochs):
+    model.train()
+    for inputs, targets in train_dataloader:
+        optimizer.zero_grad()
+        outputs = model(inputs)
+        loss = sum(criterion(output, target) for output, target in zip(outputs, targets))
+        loss.backward()
+        optimizer.step()
+
+    # Evaluate the model on the test data
+    model.eval()
+    with torch.no_grad():
+        test_loss = 0.0
+        for inputs, targets in test_dataloader:
+            outputs = model(inputs)
+            test_loss += sum(criterion(output, target) for output, target in zip(outputs, targets)).item()
+
+        test_loss /= len(test_dataloader.dataset)
+        print(f'Epoch {epoch+1}/{num_epochs}, Test Loss: {test_loss}')
+
+# Make predictions on new data
+model.eval()
+with torch.no_grad():
+    new_data_tensor = torch.tensor(new_data_scaled, dtype=torch.float32)  # Replace new_data_scaled with your new data
+    predictions = model(new_data_tensor)
+    predictions = torch.cat(predictions, dim=1).numpy()
 
 
 
